@@ -22,6 +22,9 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Initialize DB when app starts
+init_db()
+
 # Services offered
 SERVICES = [
     'Haircut - €25',
@@ -102,5 +105,4 @@ def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
 if __name__ == '__main__':
-    init_db()
     app.run(host='0.0.0.0', port=5000, debug=True)
