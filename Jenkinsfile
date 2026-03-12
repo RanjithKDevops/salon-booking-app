@@ -105,23 +105,12 @@ pipeline {
                     
                     . venv/bin/activate
                     
-                    # Initialize database
+                    # Initialize database using app.py's built-in function
                     python3 -c "
-import sqlite3
-conn = sqlite3.connect('bookings.db')
-c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS bookings
-             (id INTEGER PRIMARY KEY AUTOINCREMENT,
-              customer_name TEXT NOT NULL,
-              customer_email TEXT NOT NULL,
-              customer_phone TEXT NOT NULL,
-              service TEXT NOT NULL,
-              booking_date DATE NOT NULL,
-              booking_time TIME NOT NULL,
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-conn.commit()
-conn.close()
-print('Database initialized successfully')
+from app import app, init_db
+with app.app_context():
+    init_db()
+    print('Database initialized successfully')
 "
                     
                     # Run application
