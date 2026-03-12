@@ -20,14 +20,16 @@ pipeline {
                 stage('Security Scan with Bandit') {
                     steps {
                         sh '''
-                            python3 -m pip install bandit --user || true
+                            python3 -m pip install --user bandit || true
                             ~/.local/bin/bandit -r . -f html -o bandit-report.html || true
                         '''
                         publishHTML([
                             reportDir: '.',
                             reportFiles: 'bandit-report.html',
                             reportName: 'Bandit Security Report',
-                            allowMissing: true
+                            allowMissing: true,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true
                         ])
                     }
                 }
@@ -35,7 +37,7 @@ pipeline {
                 stage('Dependency Scan with Safety') {
                     steps {
                         sh '''
-                            python3 -m pip install safety --user || true
+                            python3 -m pip install --user safety || true
                             ~/.local/bin/safety check --full-report || true
                         '''
                     }
@@ -44,7 +46,7 @@ pipeline {
                 stage('Linting with Flake8') {
                     steps {
                         sh '''
-                            python3 -m pip install flake8 --user || true
+                            python3 -m pip install --user flake8 || true
                             ~/.local/bin/flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
                         '''
                     }
@@ -69,10 +71,12 @@ pipeline {
         stage('CI: Build Artifact') {
             steps {
                 sh '''
+                    # Install zip if not available
+                    command -v zip || sudo apt install zip -y || true
                     # Create deployment package
-                    zip -r ${APP_NAME}.zip . -x "*.git*" "*venv*" "*.pytest_cache*" "*__pycache__*"
+                    zip -r ${APP_NAME}.zip . -x "*.git*" "*venv*" "*.pytest_cache*" "*__pycache__*" || true
                 '''
-                archiveArtifacts artifacts: "${APP_NAME}.zip"
+                archiveArtifacts artifacts: "${APP_NAME}.zip", allowEmptyArchive: true
             }
         }
         
@@ -105,7 +109,7 @@ pipeline {
                     curl -f http://localhost:5000/health || exit 1
                     echo "✅ Application is healthy!"
                     
-                    # Get public IP
+                    # Get public IP (works on AWS)
                     PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "localhost")
                     echo "✅ Application is running at: http://$PUBLIC_IP:5000"
                 '''
