@@ -23,10 +23,15 @@ pipeline {
                     python3 -m venv venv
                     . venv/bin/activate
                     
-                    # Install Python packages in virtual env
+                    # Install Python packages with compatible versions
                     pip install --upgrade pip setuptools wheel
                     pip install -r requirements.txt
-                    pip install pylint pytest-cov
+                    
+                    # Install specific versions that work with Python 3.12
+                    pip install bandit==1.7.5
+                    pip install safety==2.3.5
+                    pip install flake8==6.1.0
+                    pip install pytest-cov==4.1.0
                     
                     echo "✅ Virtual environment setup complete"
                 '''
@@ -38,7 +43,8 @@ pipeline {
                 stage('Security Scan with Bandit') {
                     steps {
                         sh '''
-                            bandit -r . -f html -o bandit-report.html || true
+                            . venv/bin/activate
+                            bandit -r . -f html -o bandit-report.html || echo "Bandit found issues"
                         '''
                         publishHTML([
                             reportDir: '.',
@@ -54,7 +60,8 @@ pipeline {
                 stage('Dependency Scan with Safety') {
                     steps {
                         sh '''
-                            safety check --full-report || true
+                            . venv/bin/activate
+                            safety check --full-report || echo "Safety found vulnerabilities"
                         '''
                     }
                 }
@@ -62,16 +69,8 @@ pipeline {
                 stage('Linting with Flake8') {
                     steps {
                         sh '''
-                            flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
-                        '''
-                    }
-                }
-                
-                stage('Linting with Pylint') {
-                    steps {
-                        sh '''
                             . venv/bin/activate
-                            pylint app.py --exit-zero || echo "Pylint completed with issues"
+                            flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Flake8 found issues"
                         '''
                     }
                 }
@@ -105,7 +104,7 @@ pipeline {
                     
                     . venv/bin/activate
                     
-                    # Initialize database using app.py's built-in function
+                    # Initialize database
                     python3 -c "
 from app import app, init_db
 with app.app_context():
@@ -116,6 +115,9 @@ with app.app_context():
                     # Run application
                     nohup python3 app.py > app.log 2>&1 &
                     sleep 5
+                    
+                    # Check if app is running
+                    ps aux | grep app.py
                 '''
             }
         }
@@ -123,10 +125,16 @@ with app.app_context():
         stage('CD: Health Check') {
             steps {
                 sh '''
+                    # Test if application is running
                     curl -f http://localhost:5000/health || exit 1
                     echo "✅ Application is healthy!"
+                    
+                    # Get public IP
                     PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "3.236.201.10")
                     echo "✅ Application is running at: http://$PUBLIC_IP:5000"
+                    
+                    # Test homepage
+                    curl -I http://localhost:5000/
                 '''
             }
         }
